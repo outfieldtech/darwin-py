@@ -73,7 +73,7 @@ class Client:
                     f"Request: (endpoint={endpoint})"
                 )
             time.sleep(10)
-            return self.get(endpoint=endpoint, retry=False)
+            return self.get(endpoint=endpoint)
         if raw:
             return response
         else:
@@ -128,7 +128,7 @@ class Client:
                     f"Request: (endpoint={endpoint}, payload={payload})"
                 )
             time.sleep(10)
-            return self.put(endpoint, payload=payload, retry=False)
+            return self.put(endpoint, payload=payload)
 
         if raw:
             return response
@@ -185,7 +185,9 @@ class Client:
                 )
             if retry:
                 time.sleep(10)
-                return self.post(endpoint, payload=payload, retry=False)
+                return self.post(endpoint, payload=payload, retry=True, debug=True)
+
+        print("SUCCESS")
 
         return self._decode_response(response, debug)
 

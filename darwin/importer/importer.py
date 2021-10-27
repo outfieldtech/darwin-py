@@ -270,6 +270,6 @@ def _import_annotations(client: "Client", id: int, remote_classes, attributes, a
     payload = {"annotations": serialized_annotations}
     if append:
         payload["overwrite"] = "false"
-    res = client.post(f"/dataset_items/{id}/import", payload=payload)
+    res = client.post(f"/dataset_items/{id}/import", payload=payload, retry=True, debug=True)
     if res.get("status_code") != 200:
         print(f"warning, failed to upload annotation to {id}", res)
