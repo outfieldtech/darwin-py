@@ -9,6 +9,7 @@ from upolygon import draw_polygon
 
 import darwin.datatypes as dt
 from darwin.config import Config
+from darwin.datatypes import PathLike
 from darwin.exceptions import OutdatedDarwinJSONFormat, UnsupportedFileType
 
 if TYPE_CHECKING:
@@ -89,17 +90,15 @@ def prompt(msg: str, default: Optional[str] = None) -> str:
     return result
 
 
-def find_files(
-    files: List[Union[str, Path]], *, files_to_exclude: List[Union[str, Path]] = [], recursive: bool = True
-) -> List[Path]:
+def find_files(files: List[PathLike], *, files_to_exclude: List[PathLike] = [], recursive: bool = True) -> List[Path]:
     """Retrieve a list of all files belonging to supported extensions. The exploration can be made
     recursive and a list of files can be excluded if desired.
 
     Parameters
     ----------
-    files: List[Union[str, Path]
+    files: List[PathLike]
         List of files that will be filtered with the supported file extensions and returned.
-    files_to_exclude : List[Union[str, Path]
+    files_to_exclude : List[PathLike]
         List of files to exclude from the search.
     recursive : bool
         Flag for recursive search.
@@ -128,7 +127,7 @@ def find_files(
 def secure_continue_request() -> bool:
     """
     Asks for explicit approval from the user. Empty string not accepted
-    
+
     Returns
     -------
     bool
@@ -172,7 +171,7 @@ def get_local_filename(metadata: dict):
 
 def parse_darwin_json(path: Path, count: Optional[int]) -> Optional[dt.AnnotationFile]:
     """
-    Parses the given JSON file in v7's darwin proprietary format. Works for images, split frame 
+    Parses the given JSON file in v7's darwin proprietary format. Works for images, split frame
     videos (treated as images) and playback videos.
 
     Parameters
@@ -188,7 +187,7 @@ def parse_darwin_json(path: Path, count: Optional[int]) -> Optional[dt.Annotatio
         An AnnotationFile with the information from the parsed JSON file, or None, if there were no
         annotations in the JSON.
 
-    Raises 
+    Raises
     ------
     OutdatedDarwinJSONFormat
         If the given darwin video JSON file is missing the 'width' and 'height' keys in the 'image'
@@ -288,17 +287,19 @@ def parse_darwin_annotation(annotation: Dict[str, Any]):
     name = annotation["name"]
     main_annotation = None
     if "polygon" in annotation:
+        bounding_box = annotation.get("bounding_box")
         if "additional_paths" in annotation["polygon"]:
             paths = [annotation["polygon"]["path"]] + annotation["polygon"]["additional_paths"]
-            main_annotation = dt.make_complex_polygon(name, paths)
+            main_annotation = dt.make_complex_polygon(name, paths, bounding_box)
         else:
-            main_annotation = dt.make_polygon(name, annotation["polygon"]["path"])
+            main_annotation = dt.make_polygon(name, annotation["polygon"]["path"], bounding_box)
     elif "complex_polygon" in annotation:
+        bounding_box = annotation.get("bounding_box")
         if "additional_paths" in annotation["complex_polygon"]:
             paths = annotation["complex_polygon"]["path"] + annotation["complex_polygon"]["additional_paths"]
-            main_annotation = dt.make_complex_polygon(name, paths)
+            main_annotation = dt.make_complex_polygon(name, paths, bounding_box)
         else:
-            main_annotation = dt.make_complex_polygon(name, annotation["complex_polygon"]["path"])
+            main_annotation = dt.make_complex_polygon(name, annotation["complex_polygon"]["path"], bounding_box)
     elif "bounding_box" in annotation:
         bounding_box = annotation["bounding_box"]
         main_annotation = dt.make_bounding_box(
@@ -352,7 +353,7 @@ def split_video_annotation(annotation):
     for i, frame_url in enumerate(annotation.frame_urls):
         annotations = [a.frames[i] for a in annotation.annotations if i in a.frames]
         annotation_classes = set([annotation.annotation_class for annotation in annotations])
-        filename = f"{Path(annotation.filename).stem}/{i:07d}.jpg"
+        filename = f"{Path(annotation.filename).stem}/{i:07d}.png"
 
         frame_annotations.append(
             dt.AnnotationFile(
@@ -541,7 +542,7 @@ def chunk(items, size):
 
 def is_unix_like_os() -> bool:
     """
-    Returns True if the executing OS is Unix-based (Ubuntu or MacOS, for example) or False 
+    Returns True if the executing OS is Unix-based (Ubuntu or MacOS, for example) or False
     otherwise.
 
     Returns

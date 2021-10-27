@@ -26,13 +26,14 @@ from darwin.dataset.utils import (
     make_class_lists,
     sanitize_filename,
 )
-from darwin.datatypes import AnnotationClass
+from darwin.datatypes import AnnotationClass, PathLike
 from darwin.exceptions import NotFound, UnsupportedExportFormat
 from darwin.exporter.formats.darwin import build_image_annotation
 from darwin.item import DatasetItem, parse_dataset_item
 from darwin.item_sorter import ItemSorter
 from darwin.utils import find_files, parse_darwin_json, split_video_annotation, urljoin
 from darwin.validators import name_taken, validation_error
+from rich.console import Console
 
 if TYPE_CHECKING:
     from darwin.client import Client
@@ -81,16 +82,17 @@ class RemoteDataset:
         self.progress = progress
         self.client = client
         self.annotation_types = None
+        self.console: Console = Console()
 
     def push(
         self,
-        files_to_upload: Optional[List[Union[str, Path, LocalFile]]],
+        files_to_upload: Optional[List[Union[PathLike, LocalFile]]],
         *,
         blocking: bool = True,
         multi_threaded: bool = True,
         fps: int = 0,
         as_frames: bool = False,
-        files_to_exclude: Optional[List[Union[str, Path]]] = None,
+        files_to_exclude: Optional[List[PathLike]] = None,
         path: Optional[str] = None,
         preserve_folders: bool = False,
         progress_callback: Optional[ProgressCallback] = None,
@@ -100,14 +102,14 @@ class RemoteDataset:
 
         Parameters
         ----------
-        files_to_upload : Optional[List[Union[str, Path, LocalFile]]]
+        files_to_upload : Optional[List[Union[PathLike, LocalFile]]]
             List of files to upload. Those can be folders.
         blocking : bool
             If False, the dataset is not uploaded and a generator function is returned instead.
         multi_threaded : bool
             Uses multiprocessing to upload the dataset in parallel.
             If blocking is False this has no effect.
-        files_to_exclude : Optional[Union[str, Path]]]
+        files_to_exclude : Optional[PathLike]]
             Optional list of files to exclude from the file scan. Those can be folders.
         fps : int
             When the uploading file is a video, specify its framerate.
@@ -282,12 +284,15 @@ class RemoteDataset:
         make_class_lists(release_dir)
 
         if release.latest and is_unix_like_os():
-            latest_dir: Path = self.local_releases_path / "latest"
-            if latest_dir.is_symlink():
-                latest_dir.unlink()
+            try:
+                latest_dir: Path = self.local_releases_path / "latest"
+                if latest_dir.is_symlink():
+                    latest_dir.unlink()
 
-            target_link: Path = self.local_releases_path / release_dir.name
-            latest_dir.symlink_to(target_link)
+                target_link: Path = self.local_releases_path / release_dir.name
+                latest_dir.symlink_to(target_link)
+            except OSError:
+                self.console.log(f"Could not mark release {release.name} as latest. Continuing...")
 
         if only_annotations:
             # No images will be downloaded
@@ -369,22 +374,22 @@ class RemoteDataset:
     def fetch_annotation_type_id_for_name(self, name: str) -> Optional[int]:
         """
         Fetches annotation type id for a annotation type name, such as bounding_box
-        
+
         Parameters
         ----------
         name: str
             The name of the annotation we want the id for.
-        
+
 
         Returns
         -------
         generator : Optional[int]
             The id of the annotation type or None if it doesn't exist.
-        
+
         Raises
         ------
-        ConnectionError 
-            If it fails to establish a connection. 
+        ConnectionError
+            If it fails to establish a connection.
         """
         if not self.annotation_types:
             self.annotation_types: List[Dict[str, Any]] = self.client.get("/annotation_types")
@@ -403,13 +408,13 @@ class RemoteDataset:
         type : str
             The type of the annotation class.
         subtypes : List[str]
-            Annotation class subtypes.  
+            Annotation class subtypes.
 
         Returns
         -------
         dict
             Dictionary with the server response.
-        
+
         Raises
         ------
         ConnectionError
@@ -441,14 +446,14 @@ class RemoteDataset:
             error_handlers=[name_taken, validation_error],
         )
 
-    def add_annotation_class(self, annotation_class: AnnotationClass) -> Union[Dict, None]:
+    def add_annotation_class(self, annotation_class: Union[AnnotationClass, int]) -> Union[Dict, None]:
         """
         Adds an annotation class to this dataset.
 
         Parameters
         ----------
-        annotation_class : AnnotationClass
-            The annotation class to add.
+        annotation_class : Union[AnnotationClass, int]
+            The annotation class to add or its id.
 
         Returns
         -------
@@ -458,18 +463,24 @@ class RemoteDataset:
         # Waiting for a better api for setting classes
         # in the meantime this will do
         all_classes = self.fetch_remote_classes(True)
-        annotation_class_type = annotation_class.annotation_internal_type or annotation_class.annotation_type
-        match = [
-            cls
-            for cls in all_classes
-            if cls["name"] == annotation_class.name and annotation_class_type in cls["annotation_types"]
-        ]
-        if not match:
-            # We do not expect to reach here; as pervious logic divides annotation classes in imports
-            # between `in team` and `new to platform`
-            raise ValueError(
-                f"Annotation class name: `{annotation_class.name}`, type: `{annotation_class_type}`; does not exist in Team."
-            )
+
+        if isinstance(annotation_class, int):
+            match = [cls for cls in all_classes if cls["id"] == annotation_class]
+            if not match:
+                raise ValueError(f"Annotation class id: `{annotation_class}` does not exist in Team.")
+        else:
+            annotation_class_type = annotation_class.annotation_internal_type or annotation_class.annotation_type
+            match = [
+                cls
+                for cls in all_classes
+                if cls["name"] == annotation_class.name and annotation_class_type in cls["annotation_types"]
+            ]
+            if not match:
+                # We do not expect to reach here; as pervious logic divides annotation classes in imports
+                # between `in team` and `new to platform`
+                raise ValueError(
+                    f"Annotation class name: `{annotation_class.name}`, type: `{annotation_class_type}`; does not exist in Team."
+                )
 
         datasets = match[0]["datasets"]
         # check that we are not already part of the dataset
@@ -540,7 +551,7 @@ class RemoteDataset:
             error_handlers=[name_taken, validation_error],
         )
 
-    def get_report(self, granularity="day"):
+    def get_report(self, granularity="day") -> str:
         return self.client.get(
             f"/reports/{self.team}/annotation?group_by=dataset,user&dataset_ids={self.dataset_id}&granularity={granularity}&format=csv&include=dataset.name,user.first_name,user.last_name,user.email",
             team=self.team,

@@ -1,7 +1,7 @@
 import json
 from datetime import date
 from pathlib import Path
-from typing import Generator, List
+from typing import Iterator, List
 
 import numpy as np
 from upolygon import draw_polygon, rle_encode
@@ -22,7 +22,7 @@ class NumpyEncoder(json.JSONEncoder):
             return super(NumpyEncoder, self).default(obj)
 
 
-def export(annotation_files: Generator[dt.AnnotationFile, None, None], output_dir: Path):
+def export(annotation_files: Iterator[dt.AnnotationFile], output_dir: Path) -> None:
     output = build_json(list(annotation_files))
     # TODO, maybe an optional output name (like the dataset name if available)
     output_file_path = (output_dir / "output").with_suffix(".json")
@@ -175,12 +175,15 @@ def build_annotation(annotation_file, annotation_id, annotation: dt.Annotation, 
         y = annotation.data["y"]
         w = annotation.data["w"]
         h = annotation.data["h"]
+
         return build_annotation(
             annotation_file,
             annotation_id,
             dt.make_polygon(
                 annotation.annotation_class.name,
                 [{"x": x, "y": y}, {"x": x + w, "y": y}, {"x": x + w, "y": y + h}, {"x": x, "y": y + h}],
+                None,
+                annotation.subs,
             ),
             categories,
         )
