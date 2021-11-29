@@ -7,7 +7,6 @@ if TYPE_CHECKING:
 
 import darwin.datatypes as dt
 from darwin.datatypes import PathLike
-from darwin.utils import secure_continue_request
 from rich.progress import track
 
 
@@ -188,8 +187,8 @@ def import_annotations(
             print(
                 f"\t{missing_class.name}, type: {missing_class.annotation_internal_type or missing_class.annotation_type}"
             )
-        if not secure_continue_request():
-            return
+        # if not secure_continue_request():
+        #     return
         for missing_class in local_classes_not_in_team:
             dataset.create_annotation_class(
                 missing_class.name, missing_class.annotation_internal_type or missing_class.annotation_type
