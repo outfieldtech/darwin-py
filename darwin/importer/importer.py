@@ -162,8 +162,8 @@ def import_annotations(
         for local_file in local_files_missing_remotely:
             print(f"\t{local_file.path}: '{local_file.full_path}'")
 
-        if not secure_continue_request():
-            return
+        # if not secure_continue_request():
+        #     return
 
     local_classes_not_in_dataset, local_classes_not_in_team = _resolve_annotation_classes(
         [annotation_class for file in local_files for annotation_class in file.annotation_classes],
