@@ -1,6 +1,6 @@
-from __future__ import annotations
+# from __future__ import annotations
 
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Union
 
 import numpy as np
 from darwin.cli_functions import _error, _load_client
@@ -75,7 +75,7 @@ def get_dataset(
 
 
 class ClassificationDataset(LocalDataset):
-    def __init__(self, transform: Optional[Callable | List] = None, **kwargs):
+    def __init__(self, transform: Optional[Union[Callable, List]] = None, **kwargs):
         """
         See class `LocalDataset` for documentation
         """
