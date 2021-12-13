@@ -241,7 +241,7 @@ class InstanceSegmentationDataset(LocalDataset):
             # Create and append the new entry for this annotation
             annotations.append(
                 {
-                    "category_id": self.classes.index(annotation["name"]),
+                    "category_id": self.classes.index(annotation["name"] + 1),
                     "segmentation": sequences,
                     "bbox": [min_x, min_y, w, h],
                     "area": poly_area,
