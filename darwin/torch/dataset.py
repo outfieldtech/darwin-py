@@ -216,6 +216,8 @@ class InstanceSegmentationDataset(LocalDataset):
 
         annotations = []
         for annotation in target["annotations"]:
+            if 'attributes' in annotation:
+                continue
             if "polygon" not in annotation and "complex_polygon" not in annotation:
                 print(f"Warning: missing polygon in annotation {self.annotations_path[index]}")
             # Extract the sequences of coordinates from the polygon annotation
@@ -241,7 +243,7 @@ class InstanceSegmentationDataset(LocalDataset):
             # Create and append the new entry for this annotation
             annotations.append(
                 {
-                    "category_id": self.classes.index(annotation["name"] + 1),
+                    "category_id": self.classes.index(annotation["name"]) + 1,
                     "segmentation": sequences,
                     "bbox": [min_x, min_y, w, h],
                     "area": poly_area,
